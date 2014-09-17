@@ -1,15 +1,66 @@
-import Tools
-import LocalSettings
+import qualified Tools as T
+import qualified LocalSettings as Settings
 
 data MazePosition = MazeOff
                   | MazeAt Int Int Char
                   | MazeSolved
 
-draw s = mapM_ putStrLn s >> (mapM_ putStrLn $ take (screenSize - length s) (repeat ""))
+data DrawMode = FullSight
+              | Sight3d
+              deriving (Eq,Enum,Bounded)
 
-move :: [String] -> Int -> Int -> Char -> Char -> MazePosition
-move m x y c mv =
-    let (x1,y1,c1) = case (c,mv) of
+data MazeState = MazeState { mazeMap :: [String],
+                             coordX :: Int,
+                             coordY :: Int,
+                             coordO :: Char,
+                             drawMode ::DrawMode }
+
+draw :: MazeState -> IO ()
+draw s = let c = coordO s
+             m = mazeMap s
+             x = coordX s
+             y = coordY s
+             left '>' (x,y) = (x,y-1)
+             left 'v' (x,y) = (x+1,y)
+             left '<' (x,y) = (x,y+1)
+             left '^' (x,y) = (x-1,y)
+             right '>' (x,y) = (x,y+1)
+             right 'v' (x,y) = (x-1,y)
+             right '<' (x,y) = (x,y-1)
+             right '^' (x,y) = (x+1,y)
+             fwd '>' (x,y) = (x+1,y)
+             fwd 'v' (x,y) = (x,y+1)
+             fwd '<' (x,y) = (x-1,y)
+             fwd '^' (x,y) = (x,y-1)
+             len = length m
+             l = left c
+             r = right c
+             f = fwd c
+             v (x,y) | y < 0 = '*'
+                     | y >= len = '.'
+                     | or [x < 0, x >= length (m !! y)] = '*'
+                     | ' ' /= m !! y !! x = '*'
+                     | otherwise = ' '
+             view = [[v . l . f . f $ (x,y), v . f . f $ (x,y), v . r . f . f $ (x,y)],
+                     [v . l . f $ (x,y), v . f $ (x,y), v . r . f $ (x,y)],
+                     [v . l $ (x,y), v (x,y), v . r $ (x,y)] ]
+         in
+             if drawMode s == FullSight then
+                 mapM_ putStrLn (T.updateMap c m x y) >> 
+                     (mapM_ putStrLn $ take (Settings.screenSize - length m) (repeat ""))
+             else
+                 do
+                     putStrLn $ (show x) ++ "/" ++ (show y) ++ "/" ++ [c] ++ "/" ++ (show $ length m)
+                     mapM_ putStrLn view
+                     mapM_ putStrLn $ take (Settings.screenSize - 1 - (length view)) (repeat "")
+
+move :: MazeState -> Char -> MazePosition
+move st mv =
+    let x = coordX st
+        y = coordY st
+        c = coordO st
+        m = mazeMap st
+        (x1,y1,c1) = case (c,mv) of
                          ('v','k') -> (x,y,'<')
                          ('<','k') -> (x,y,'^')
                          ('^','k') -> (x,y,'>')
@@ -34,18 +85,22 @@ move m x y c mv =
         if (y1 >= length m) then MazeSolved
         else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff                             
         else MazeAt x1 y1 c1
-        
-mainLoop :: [String] -> Int -> Int -> Char -> IO ()
-mainLoop m x y c = do
+
+mainLoop :: MazeState -> IO ()
+mainLoop st = do
     mv <- getChar
     if mv == 'x' then
         return ()
+    else if mv == 's' then
+        let st1 = st { drawMode = T.roll $ drawMode st } in
+        draw st1 >> mainLoop st1
     else
-        case move m x y c mv of
-            MazeOff -> mainLoop m x y c
+        case move st mv of
+            MazeOff -> mainLoop st
             MazeAt x1 y1 c1 -> do
-                draw $ updateMap c1 m x1 y1
-                mainLoop m x1 y1 c1
+                let st1 = st { coordX = x1, coordY = y1, coordO = c1 }
+                draw st1 -- $ updateMap c1 m x1 y1
+                mainLoop st1
             MazeSolved -> putStrLn "Herzlichen Glueckwunsch. Du hast es geschafft!"
 
 
@@ -53,5 +108,6 @@ main :: IO ()
 main = do
     mazeString <- readFile "Labyrinth3d.map"
     let maze = lines mazeString
-    draw $ updateMap 'v' maze 0 0
-    mainLoop maze 0 0 'v'
+    let st = MazeState maze 0 0 'v' FullSight
+    draw st -- $ updateMap maze 0 0 'v'
+    mainLoop st
