@@ -15,6 +15,28 @@ data MazeState = MazeState { mazeMap :: [String],
                              coordO :: Char,
                              drawMode ::DrawMode }
 
+data Direction = Lft | Rght | Fwd | Bckw
+               deriving (Eq,Enum,Bounded,Show)
+
+data Orientation = North | East | South | West
+                 deriving (Eq,Enum,Bounded,Show)
+
+ship :: Orientation -> Char
+ship North = '^'
+ship East = '>'
+ship South = 'v'
+ship West = '<'
+
+-- | advance one step into given direction
+advance :: Direction -> Orientation -> (Int,Int) -> (Int, Int)
+advance Fwd East (x,y) = (x+1,y)
+advance Fwd South (x,y) = (x,y+1)
+advance Fwd West (x,y) = (x-1,y)
+advance Fwd North (x,y) = (x,y-1)
+advance Lft o p = advance Fwd (T.rollback o) p
+advance Rght o p = advance Fwd (T.roll o) p
+advance Bckw o p = advance Fwd (T.roll . T.roll $ o) p
+
 draw :: MazeState -> IO ()
 draw s = let c = coordO s
              m = mazeMap s
@@ -54,29 +76,29 @@ draw s = let c = coordO s
                      mapM_ putStrLn view
                      mapM_ putStrLn $ take (Settings.screenSize - 1 - (length view)) (repeat "")
 
-move :: MazeState -> Char -> MazePosition
-move st mv =
+moveShip :: MazeState -> Char -> MazePosition
+moveShip st mv =
     let x = coordX st
         y = coordY st
         c = coordO st
         m = mazeMap st
         (x1,y1,c1) = case (c,mv) of
-                         ('v','k') -> (x,y,'<')
+                         ('v','k') -> (x,y,'<') -- FIXME: implement by roll
                          ('<','k') -> (x,y,'^')
                          ('^','k') -> (x,y,'>')
                          ('>','k') -> (x,y,'v')
                          
-                         ('v','j') -> (x,y,'>')
+                         ('v','j') -> (x,y,'>') --FIXME: implement by rollback
                          ('<','j') -> (x,y,'v')
                          ('^','j') -> (x,y,'<')
                          ('>','j') -> (x,y,'^')
                          
-                         ('v','i') -> (x,y+1,c)
+                         ('v','i') -> (x,y+1,c) --FIXME: implement by advance
                          ('<','i') -> (x-1,y,c)
                          ('^','i') -> (x,y-1,c)
                          ('>','i') -> (x+1,y,c)
                          
-                         ('v','m') -> (x,y-1,c)
+                         ('v','m') -> (x,y-1,c) --FIXME: implement by advance
                          ('<','m') -> (x+1,y,c)
                          ('^','m') -> (x,y+1,c)
                          ('>','m') -> (x-1,y,c)
@@ -95,7 +117,7 @@ mainLoop st = do
         let st1 = st { drawMode = T.roll $ drawMode st } in
         draw st1 >> mainLoop st1
     else
-        case move st mv of
+        case moveShip st mv of
             MazeOff -> mainLoop st
             MazeAt x1 y1 c1 -> do
                 let st1 = st { coordX = x1, coordY = y1, coordO = c1 }
