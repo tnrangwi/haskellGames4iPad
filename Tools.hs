@@ -4,7 +4,8 @@ module Tools
   updateAt,
   updateMap,
   getRandomSequence,
-  roll
+  roll,
+  rollback
 )
 
 where
@@ -64,5 +65,10 @@ getRandomSequence i =
 roll :: (Enum a, Bounded a, Eq a) => a -> a
 roll s | s == maxBound = toEnum 0
        | otherwise = succ s
+
+rollback :: (Enum a, Bounded a, Eq a) => a -> a
+rollback s | s == minBound = toEnum maxBound
+           | otherwise = pred s
+
 
 
