@@ -2,18 +2,12 @@ import qualified Tools as T
 import qualified LocalSettings as Settings
 
 data MazePosition = MazeOff
-                  | MazeAt Int Int Char
+                  | MazeAt Int Int Orientation
                   | MazeSolved
 
 data DrawMode = FullSight
               | Sight3d
               deriving (Eq,Enum,Bounded)
-
-data MazeState = MazeState { mazeMap :: [String],
-                             coordX :: Int,
-                             coordY :: Int,
-                             coordO :: Char,
-                             drawMode ::DrawMode }
 
 data Direction = Lft | Rght | Fwd | Bckw
                deriving (Eq,Enum,Bounded,Show)
@@ -21,93 +15,94 @@ data Direction = Lft | Rght | Fwd | Bckw
 data Orientation = North | East | South | West
                  deriving (Eq,Enum,Bounded,Show)
 
+data MazeState = MazeState { mazeMap :: [String],
+                             coordX :: Int,
+                             coordY :: Int,
+                             coordO :: Orientation,
+                             drawMode ::DrawMode }
+
+
+-- | show ship char for selected orientation
 ship :: Orientation -> Char
 ship North = '^'
 ship East = '>'
 ship South = 'v'
 ship West = '<'
 
--- | advance one step into given direction
-advance :: Direction -> Orientation -> (Int,Int) -> (Int, Int)
-advance Fwd East (x,y) = (x+1,y)
-advance Fwd South (x,y) = (x,y+1)
-advance Fwd West (x,y) = (x-1,y)
-advance Fwd North (x,y) = (x,y-1)
-advance Lft o p = advance Fwd (T.rollback o) p
-advance Rght o p = advance Fwd (T.roll o) p
-advance Bckw o p = advance Fwd (T.roll . T.roll $ o) p
+-- | turn ship into given direction
+turn :: Direction -> (Orientation,(Int,Int)) -> (Orientation,(Int,Int))
+turn Lft (o,s) = (T.rollback o,s)
+turn Rght (o,s) = (T.roll o, s)
+turn Bckw p = turn Lft . turn Lft $ p
+turn Fwd p = id $ p
 
+-- | move ship one step into given direction
+move :: Direction -> (Orientation, (Int,Int)) -> (Orientation, (Int, Int))
+move Fwd (o,(x,y)) = let step East = (x+1,y)
+                         step South = (x, y+1)
+                         step West = (x-1,y)
+                         step North = (x,y-1)
+                     in (o,step o)
+move Lft p = turn Rght . move Fwd . turn Lft $ p
+move Rght p = turn Lft . move Fwd . turn Rght $ p
+move Bckw p = turn Bckw . move Fwd . turn Bckw $ p
+
+-- | Draw ship. FIXME: Split up into IO part and picture calculation.
 draw :: MazeState -> IO ()
-draw s = let c = coordO s
+draw s = let o = coordO s
              m = mazeMap s
              x = coordX s
              y = coordY s
-             left '>' (x,y) = (x,y-1)
-             left 'v' (x,y) = (x+1,y)
-             left '<' (x,y) = (x,y+1)
-             left '^' (x,y) = (x-1,y)
-             right '>' (x,y) = (x,y+1)
-             right 'v' (x,y) = (x-1,y)
-             right '<' (x,y) = (x,y-1)
-             right '^' (x,y) = (x+1,y)
-             fwd '>' (x,y) = (x+1,y)
-             fwd 'v' (x,y) = (x,y+1)
-             fwd '<' (x,y) = (x-1,y)
-             fwd '^' (x,y) = (x,y-1)
+             p = (o,(x,y))
+
              len = length m
-             l = left c
-             r = right c
-             f = fwd c
-             v (x,y) | y < 0 = '*'
-                     | y >= len = '.'
-                     | or [x < 0, x >= length (m !! y)] = '*'
-                     | ' ' /= m !! y !! x = '*'
-                     | otherwise = ' '
-             view = [[v . l . f . f $ (x,y), v . f . f $ (x,y), v . r . f . f $ (x,y)],
-                     [v . l . f $ (x,y), v . f $ (x,y), v . r . f $ (x,y)],
-                     [v . l $ (x,y), v (x,y), v . r $ (x,y)] ]
+             v (_,(x,y)) | y < 0 = '*'
+                         | y >= len = '.'
+                         | or [x < 0, x >= length (m !! y)] = '*'
+                         | ' ' /= m !! y !! x = '*'
+                         | otherwise = ' '
+             view = [[v . move Lft . move Fwd . move Fwd $ p,
+                            v . move Fwd . move Fwd $ p,
+                            v . move Rght . move Fwd . move Fwd $ p],
+                       [v . move Lft . move Fwd $ p,
+                            v . move Fwd $ p,
+                            v . move Rght . move Fwd $ p],
+                       [v . move Lft $ p,
+                            '^',
+                            v . move Rght $ p] ]
          in
              if drawMode s == FullSight then
-                 mapM_ putStrLn (T.updateMap c m x y) >> 
+                 mapM_ putStrLn (T.updateMap (ship o) m x y) >> 
                      (mapM_ putStrLn $ take (Settings.screenSize - length m) (repeat ""))
              else
                  do
-                     putStrLn $ (show x) ++ "/" ++ (show y) ++ "/" ++ [c] ++ "/" ++ (show $ length m)
+                     putStrLn $ (show x) ++ "/" ++ (show y) ++ "/" ++ (show o) ++ "/" ++ (show $ length m)
                      mapM_ putStrLn view
                      mapM_ putStrLn $ take (Settings.screenSize - 1 - (length view)) (repeat "")
 
+-- | Move ship and calculate new position. Return solved, wrong move or new position.
 moveShip :: MazeState -> Char -> MazePosition
 moveShip st mv =
     let x = coordX st
         y = coordY st
-        c = coordO st
+        o = coordO st
+        p = (o,(x,y))
         m = mazeMap st
-        (x1,y1,c1) = case (c,mv) of
-                         ('v','k') -> (x,y,'<') -- FIXME: implement by roll
-                         ('<','k') -> (x,y,'^')
-                         ('^','k') -> (x,y,'>')
-                         ('>','k') -> (x,y,'v')
-                         
-                         ('v','j') -> (x,y,'>') --FIXME: implement by rollback
-                         ('<','j') -> (x,y,'v')
-                         ('^','j') -> (x,y,'<')
-                         ('>','j') -> (x,y,'^')
-                         
-                         ('v','i') -> (x,y+1,c) --FIXME: implement by advance
-                         ('<','i') -> (x-1,y,c)
-                         ('^','i') -> (x,y-1,c)
-                         ('>','i') -> (x+1,y,c)
-                         
-                         ('v','m') -> (x,y-1,c) --FIXME: implement by advance
-                         ('<','m') -> (x+1,y,c)
-                         ('^','m') -> (x,y+1,c)
-                         ('>','m') -> (x-1,y,c)
-                         _ -> (-1,-1,c)
+        new@(o1,(x1,y1)) = case mv of
+                  'k' -> turn Rght p
+                  'j' -> turn Lft p
+                  'i' -> move Fwd p
+                  'm' -> move Bckw p
+                  _ -> (o,(-1,-1))
+
+        
     in
         if (y1 >= length m) then MazeSolved
         else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff                             
-        else MazeAt x1 y1 c1
+        else MazeAt x1 y1 o1
 
+-- | Mainloop containing all IO and state control.
+-- FIXME: Add online help.
 mainLoop :: MazeState -> IO ()
 mainLoop st = do
     mv <- getChar
@@ -119,17 +114,17 @@ mainLoop st = do
     else
         case moveShip st mv of
             MazeOff -> mainLoop st
-            MazeAt x1 y1 c1 -> do
-                let st1 = st { coordX = x1, coordY = y1, coordO = c1 }
-                draw st1 -- $ updateMap c1 m x1 y1
+            MazeAt x1 y1 o1 -> do
+                let st1 = st { coordX = x1, coordY = y1, coordO = o1 }
+                draw st1
                 mainLoop st1
             MazeSolved -> putStrLn "Herzlichen Glueckwunsch. Du hast es geschafft!"
 
-
+-- | Main function called from Haskell. Initialize maze and start main loop.
 main :: IO ()
 main = do
     mazeString <- readFile "Labyrinth3d.map"
     let maze = lines mazeString
-    let st = MazeState maze 0 0 'v' FullSight
-    draw st -- $ updateMap maze 0 0 'v'
+    let st = MazeState maze 0 0 South FullSight
+    draw st
     mainLoop st
