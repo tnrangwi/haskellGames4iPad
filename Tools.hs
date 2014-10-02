@@ -1,3 +1,6 @@
+-- | Collection of tool functions needed by the game implementations.
+-- All conten in one Tool module now, mixing IO functions for getting random
+-- numbers with pure functions for list manipulations.
 module Tools
 
 (
@@ -16,7 +19,10 @@ import qualified System.Random as R
 -- |Update a sequence at the given position with the
 -- given element. Return original if index is out of
 -- bounds.
-updateAt :: [a] ->  Int -> a -> [a]
+updateAt :: [a]  -- ^ Lust to update.
+         ->  Int -- ^ Update at position.
+         -> a    -- ^ Update with thatcharacter.
+         -> [a]  -- ^ Updated list.
 updateAt l i c = if or [i < 0, i >= length l] then
                      l
                  else
@@ -25,7 +31,12 @@ updateAt l i c = if or [i < 0, i >= length l] then
 -- |Update a 2-dimensional map given as list of strings
 -- with the given character at the given x / y 
 -- coordinates.
-updateMap :: Char -> [String] -> Int -> Int -> [String]
+updateMap :: Char     -- ^ Character to put into 2-dimensional map
+          -> [String] -- ^ line by line the lines of the map, left-justified, but
+                      -- possibly of different length. Off the array meens off the map.
+          -> Int      -- ^ x coordinate of the position for the char to insert.
+          -> Int      -- ^ y coordinate of the position for the char to insert.
+          -> [String] -- ^ resulting map with additional character.
 updateMap c m x y = if or [y < 0, x < 0, y >= length m, x >= length (m !! y)] then
                        m
                    else
@@ -56,19 +67,19 @@ randomUniqueSequence x g = gen [] g
 -- when a game just needs once such a series at startup.
 -- It is not, when sequences are needes quite often. In
 -- that case better fetch the random number generator and
--- usw pure code to generate a large number of randoms.
+-- use pure code to generate a large number of randoms.
 getRandomSequence :: Int -> IO [Int]
 getRandomSequence i =
   T.getClockTime >>= return . randomUniqueSequence i . R.mkStdGen . T.ctSec . T.toUTCTime
+
 -- |Roll a finite enumeration to the next value -- switching to the first when the last
 -- value of the enumeration is reached.
 roll :: (Enum a, Bounded a, Eq a) => a -> a
 roll s | s == maxBound = toEnum 0
        | otherwise = succ s
 
+-- | Same as roll, but roll backwards, i.e. choose tge next "smaller" element
+-- from the given enumeration.
 rollback :: (Enum a, Bounded a, Eq a) => a -> a
 rollback s | s == minBound = toEnum maxBound
            | otherwise = pred s
-
-
-
