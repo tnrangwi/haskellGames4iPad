@@ -119,7 +119,6 @@ getOK :: IO ()
 getOK = getChar >> return ()
 
 -- | Mainloop containing all IO and state control.
--- FIXME: Add online help.
 -- FIXME: Split off new state calculation from IO.
 mainLoop :: MazeState -> IO ()
 mainLoop st = do
