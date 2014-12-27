@@ -75,11 +75,11 @@ getRandomSequence i =
 -- |Roll a finite enumeration to the next value -- switching to the first when the last
 -- value of the enumeration is reached.
 roll :: (Enum a, Bounded a, Eq a) => a -> a
-roll s | s == maxBound = toEnum 0
+roll s | s == maxBound = minBound
        | otherwise = succ s
 
--- | Same as roll, but roll backwards, i.e. choose tge next "smaller" element
+-- | Same as roll, but roll backwards, i.e. choose the next "smaller" element
 -- from the given enumeration.
 rollback :: (Enum a, Bounded a, Eq a) => a -> a
-rollback s | s == minBound = toEnum maxBound
+rollback s | s == minBound = maxBound
            | otherwise = pred s
