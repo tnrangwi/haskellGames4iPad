@@ -85,11 +85,13 @@ view (MazeState m p@(Position o (x,y)) Sight3d) =
            '^',
            v . move Rght $ p] ]
 
--- | Draw ship. Calculate output using pure function and put to stdout result
-draw :: MazeState -> IO ()
-draw s = let m = view s
-         in mapM_ putStrLn m >> (mapM_ putStrLn $ take (Settings.screenSize - length m) (repeat ""))
+-- | Paint String array to screen.
+paint :: [String] -> IO ()
+paint s = mapM_ putStrLn s >> (mapM_ putStrLn $ take (Settings.screenSize - length s) (repeat ""))
 
+-- | Draw ship. Calculate output using pure function and put result to stdout
+draw :: MazeState -> IO ()
+draw = paint . view
 
 -- | Move ship and calculate new position. Return solved, wrong move or new position.
 moveShip :: MazeState    -- ^ Game state. FIXME: Only map and position required.
@@ -112,6 +114,10 @@ moveShip st mv =
         else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff                             
         else MazeAt p1
 
+-- | Wait for arbitrary key
+getOK :: IO ()
+getOK = getChar >> return ()
+
 -- | Mainloop containing all IO and state control.
 -- FIXME: Add online help.
 -- FIXME: Split off new state calculation from IO.
@@ -120,6 +126,17 @@ mainLoop st = do
     mv <- getChar
     if mv == 'x' then
         return ()
+    else if mv == 'h' then
+        paint [ "h: This help",
+                "",
+                " I    -> fwd",
+                "J K   -> turn left / right",
+                " M    -> bwd",
+                "",
+                "s: Switch view",
+                "x: eXit",
+                "",
+                "[Hit any key to continue]"] >> getOK >> draw st >> mainLoop st
     else if mv == 's' then
         let st1 = st { drawMode = T.roll $ drawMode st } in
         draw st1 >> mainLoop st1
