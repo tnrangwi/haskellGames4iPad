@@ -114,7 +114,10 @@ view (MazeState m p@(Position o (x,y)) Sight3d) =
         v Exit = '.'
         v Ship = '^'
         mz = abstractView m p
-    in map (map v) mz
+    in concat [
+                [(show x) ++ "/" ++ (show y) ++ "/" ++ (show o) ++ "/" ++ (show (length m))],
+                map (map v) mz
+              ]
 view (MazeState m p@(Position o (x,y)) SightGfx) = map show (abstractView m p)
 
 
