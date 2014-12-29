@@ -118,7 +118,23 @@ view (MazeState m p@(Position o (x,y)) Sight3d) =
                 [(show x) ++ "/" ++ (show y) ++ "/" ++ (show o) ++ "/" ++ (show (length m))],
                 map (map v) mz
               ]
-view (MazeState m p@(Position o (x,y)) SightGfx) = map show (abstractView m p)
+view (MazeState m p@(Position o (x,y)) SightGfx) = 
+    let mz = abstractView m p
+        st = (show x) ++ "/" ++ (show y) ++ "/" ++ (show o) ++ "/" ++ (show (length m))
+        v Stone = ["/-\\", "| |", "\\-/"]
+        v Space = ["   ", "   ", "   "]
+        v Exit = ["...", "...", "..."]
+        v Ship = ["   ", " ^ ", "   "]
+        -- FIXME: ugly, use map
+        d l = [
+                concat [(v (l !! 0)) !! 0, (v (l !! 1)) !! 0, (v (l !! 2)) !! 0],
+                concat [(v (l !! 0)) !! 1, (v (l !! 1)) !! 1, (v (l !! 2)) !! 1],
+                concat [(v (l !! 0)) !! 2, (v (l !! 1)) !! 2, (v (l !! 2)) !! 2]
+              ]
+    in concat [
+                [st],
+                concat (map d mz)
+              ]
 
 
 -- | Paint String array to screen.
