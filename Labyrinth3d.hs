@@ -9,7 +9,12 @@ data MazePosition = MazeOff         -- ^ Forbidden movement.
 -- | Configuration how to show current position and environment.
 data DrawMode = FullSight -- ^ Show whole labyrinth and "ship" with orientation.
               | Sight3d   -- ^ Show only what "ship" can see from its position.
+              | SightGfx  -- ^ Show kind of graphics from current position
               deriving (Eq,Enum,Bounded)
+
+-- | One brick of the maze's map
+data Brick = Stone | Space | Exit | Ship
+           deriving (Eq,Enum,Bounded,Show)
 
 -- | A direction for a movement.
 data Direction = Lft | Rght | Fwd | Bckw
@@ -62,28 +67,56 @@ move Lft p = turn Rght . move Fwd . turn Lft $ p
 move Rght p = turn Lft . move Fwd . turn Rght $ p
 move Bckw p = turn Bckw . move Fwd . turn Bckw $ p
 
+-- | Calculate content within maze for position
+-- FIXME: Better convert into a maze datatype during read-in
+-- and then use functions to retrieve data at position
+content :: [String]  -- ^ Map of maze
+        -> (Int,Int) -- ^ Coordinates
+        -> Brick     -- ^ What is there
+content m (x,y) | y < 0 = Stone
+                | y >= (length m) = Exit
+                | or [x < 0, x >= length (m !! y)] = Stone
+                | ' ' /= m !! y !! x = Stone
+                | otherwise = Space
+
+-- | Create an abstract view from the current position into the maze.
+abstractView :: [String]  -- ^ The map of the maze.
+             -> Position  -- ^ The current position to generate the view from.
+             -> [[Brick]] -- ^ Up to three rows, the last we stand in the middle.
+abstractView m p =
+            [
+              [
+                content m . coord . move Lft . move Fwd . move Fwd $ p,
+                content m . coord . move Fwd . move Fwd $ p,
+                content m . coord . move Rght . move Fwd . move Fwd $ p
+              ],
+              [
+                content m . coord . move Lft . move Fwd $ p,
+                content m . coord . move Fwd $ p,
+                content m . coord . move Rght . move Fwd $ p
+              ],
+              [
+                content m . coord . move Lft $ p,
+                Ship,
+                content m . coord . move Rght $ p
+              ]
+            ]
+
+
 -- | Calculate a list of strings for output, reflecting the
 -- ship at the current position of the map.
 view :: MazeState -- ^ Map, ship direction/position and selected view mode
-     -> [String]  -- ^ Output, one line ech, FIXME: be more abstract for graphical view in opengl
+     -> [String]  -- ^ Output, one line each
 view (MazeState m (Position o (x,y)) FullSight) = T.updateMap (ship o) m x y
 view (MazeState m p@(Position o (x,y)) Sight3d) =
-    let len = length m
-        v (Position _ (x,y)) | y < 0 = '*'
-                             | y >= len = '.'
-                             | or [x < 0, x >= length (m !! y)] = '*'
-                             | ' ' /= m !! y !! x = '*'
-                             | otherwise = ' '
-    in [(show x) ++ "/" ++ (show y) ++ "/" ++ (show o) ++ "/" ++ (show len),
-        [v . move Lft . move Fwd . move Fwd $ p,
-           v . move Fwd . move Fwd $ p,
-           v . move Rght . move Fwd . move Fwd $ p],
-        [v . move Lft . move Fwd $ p,
-           v . move Fwd $ p,
-           v . move Rght . move Fwd $ p],
-        [v . move Lft $ p,
-           '^',
-           v . move Rght $ p] ]
+    let v Stone = '*'
+        v Space = ' '
+        v Exit = '.'
+        v Ship = '^'
+        mz = abstractView m p
+    in map (map v) mz
+view (MazeState m p@(Position o (x,y)) SightGfx) = map show (abstractView m p)
+
 
 -- | Paint String array to screen.
 paint :: [String] -> IO ()
@@ -151,7 +184,7 @@ mainLoop st = do
 -- | Main function called from Haskell. Initialize maze and start main loop.
 main :: IO ()
 main = do
-    mazeString <- readFile "Labyrinth3d.map"
+    mazeString <- readFile "Labyrinth.map"
     let maze = lines mazeString
     let st = MazeState maze (Position South (0,0)) FullSight
     draw st
