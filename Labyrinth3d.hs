@@ -1,5 +1,6 @@
 import qualified Tools as T
 import qualified LocalSettings as Settings
+import Directory
 
 -- | Calculated position result. Coordinates, forbidden movement or left labyrinth.
 data MazePosition = MazeOff         -- ^ Forbidden movement.
@@ -126,7 +127,13 @@ view (MazeState m p@(Position o (x,y)) SightGfx) =
         v Exit = ["...", "...", "..."]
         v Ship = ["   ", " ^ ", "   "]
         -- FIXME: ugly, use map
-        d l = [
+        d l =
+            -- let m = map v l
+            --    g = map (\x -> x !! 0) m
+            --    h = map (\x -> x !! 1) m
+            --    l = map (\x -> x !! 2) m
+            -- in 
+              [
                 concat [(v (l !! 0)) !! 0, (v (l !! 1)) !! 0, (v (l !! 2)) !! 0],
                 concat [(v (l !! 0)) !! 1, (v (l !! 1)) !! 1, (v (l !! 2)) !! 1],
                 concat [(v (l !! 0)) !! 2, (v (l !! 1)) !! 2, (v (l !! 2)) !! 2]
@@ -170,6 +177,23 @@ moveShip st mv =
 getOK :: IO ()
 getOK = getChar >> return ()
 
+-- | Query user to select one item from a short list.
+selectFrom :: [String]  -- ^ Selection of strings.
+           -> IO String -- ^ Selected string.
+selectFrom l = do
+    mapM_ (\(n,s) -> putStrLn $ concat[show n,":",s]) (zip (take 9 [1 ..]) l)
+    putStrLn "Your selection:"
+    c <- getChar
+    let r = if c `elem` "123456789" then
+                read [c] :: Int
+            else
+                0
+    if and [r > 0, r <= length l] then
+        return (l !! (r - 1))
+      else
+        selectFrom l
+        
+
 -- | Mainloop containing all IO and state control.
 -- FIXME: Split off new state calculation from IO.
 mainLoop :: MazeState -> IO ()
@@ -203,7 +227,10 @@ mainLoop st = do
 -- | Main function called from Haskell. Initialize maze and start main loop.
 main :: IO ()
 main = do
-    mazeString <- readFile "Labyrinth.map"
+    let path = "."
+    files <- T.findFiles path ".map"
+    file <- selectFrom files
+    mazeString <- readFile (concat [path, "/", file])
     let maze = lines mazeString
     let st = MazeState maze (Position South (0,0)) FullSight
     draw st
