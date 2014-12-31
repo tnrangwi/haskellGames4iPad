@@ -8,13 +8,16 @@ module Tools
   updateMap,
   getRandomSequence,
   roll,
-  rollback
+  rollback,
+  endsWith,
+  findFiles
 )
 
 where
 
 import qualified System.Time as T
 import qualified System.Random as R
+import qualified System.Directory as D
 
 -- |Update a sequence at the given position with the
 -- given element. Return original if index is out of
@@ -83,3 +86,16 @@ roll s | s == maxBound = minBound
 rollback :: (Enum a, Bounded a, Eq a) => a -> a
 rollback s | s == minBound = maxBound
            | otherwise = pred s
+
+-- | Check whether a list ends with a given sequence
+endsWith :: Eq a
+         => [a] -- ^ suffix to compare
+         -> [a] -- ^ target to check
+         -> Bool
+endsWith comp target = (drop (max 0 ((length target) - (length comp))) target) == comp
+
+-- | Find files with given extension in directory
+findFiles :: FilePath -> String -> IO [String]
+findFiles path suffix = do
+    l <- D.getDirectoryContents path
+    return [ x | x <- l, endsWith suffix x ]
