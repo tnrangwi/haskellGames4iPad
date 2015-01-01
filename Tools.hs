@@ -9,8 +9,8 @@ module Tools
   getRandomSequence,
   roll,
   rollback,
-  endsWith,
-  findFiles
+  findFiles,
+  mergeRectangle
 )
 
 where
@@ -18,6 +18,7 @@ where
 import qualified System.Time as T
 import qualified System.Random as R
 import qualified System.Directory as D
+import qualified Data.List as DL
 
 -- |Update a sequence at the given position with the
 -- given element. Return original if index is out of
@@ -87,15 +88,24 @@ rollback :: (Enum a, Bounded a, Eq a) => a -> a
 rollback s | s == minBound = maxBound
            | otherwise = pred s
 
--- | Check whether a list ends with a given sequence
-endsWith :: Eq a
-         => [a] -- ^ suffix to compare
-         -> [a] -- ^ target to check
-         -> Bool
-endsWith comp target = (drop (max 0 ((length target) - (length comp))) target) == comp
-
 -- | Find files with given extension in directory
+
 findFiles :: FilePath -> String -> IO [String]
 findFiles path suffix = do
     l <- D.getDirectoryContents path
-    return [ x | x <- l, endsWith suffix x ]
+    return [ x | x <- l, DL.isSuffixOf suffix x ]
+
+-- | Merge rectangles of equal height into one rectangle
+-- with the same height.
+-- Example: Convert a list of a list of lines into o list of lines,
+-- concatenating the first of each, the second of each ...
+mergeRectangle :: [[[a]]] -> [[a]]
+mergeRectangle [] = [[]]
+mergeRectangle l =
+    let x = maximum $ map length l
+        n = minimum $ map length l
+    in
+        if or [n == 0, n /= x] then
+            [[]]
+        else
+            [concat (map f l) | f <- (map (flip (!!)) [0 .. (x-1)])]
