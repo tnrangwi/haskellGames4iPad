@@ -1,6 +1,5 @@
 import qualified Tools as T
 import qualified LocalSettings as Settings
-import Directory
 
 -- | Calculated position result. Coordinates, forbidden movement or left labyrinth.
 data MazePosition = MazeOff         -- ^ Forbidden movement.
@@ -126,21 +125,10 @@ view (MazeState m p@(Position o (x,y)) SightGfx) =
         v Space = ["   ", "   ", "   "]
         v Exit = ["...", "...", "..."]
         v Ship = ["   ", " ^ ", "   "]
-        -- FIXME: ugly, use map
-        d l =
-            -- let m = map v l
-            --    g = map (\x -> x !! 0) m
-            --    h = map (\x -> x !! 1) m
-            --    l = map (\x -> x !! 2) m
-            -- in 
-              [
-                concat [(v (l !! 0)) !! 0, (v (l !! 1)) !! 0, (v (l !! 2)) !! 0],
-                concat [(v (l !! 0)) !! 1, (v (l !! 1)) !! 1, (v (l !! 2)) !! 1],
-                concat [(v (l !! 0)) !! 2, (v (l !! 1)) !! 2, (v (l !! 2)) !! 2]
-              ]
+        matrix = map (T.mergeRectangle . map v) mz
     in concat [
                 [st],
-                concat (map d mz)
+                concat matrix
               ]
 
 
