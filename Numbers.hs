@@ -1,4 +1,4 @@
-import Tools
+import qualified Tools as T
 import LocalSettings
 import Text.Printf
 import Data.List
@@ -27,9 +27,9 @@ move m x y c = let (x1,y1) = case c of
 roll :: [[String]] -> (Int,Int) -> (Int,Int) -> [[String]]
 roll m (x,y) (x1,y1) = let s = m !! y !! x
                            s1 = m !! y1 !! x1
-                           u1 = updateAt m y (updateAt (m !! y) x s1)
+                           u1 = T.updateAt m y (T.updateAt (m !! y) x s1)
                        in
-                           updateAt u1 y1 (updateAt (u1 !! y1) x1 s)
+                           T.updateAt u1 y1 (T.updateAt (u1 !! y1) x1 s)
 
 finalForm :: [[String]] -> Bool
 finalForm m = let fl = concat m
@@ -76,7 +76,7 @@ mainLoop m x y = do
 
 main :: IO ()
 main = do
-    box <- getRandomSequence 16
+    box <- T.getRandomSequence 16
     let gamesMap = getNumberMap $ map pred box
     draw gamesMap
     let (x,y) = getStart box
