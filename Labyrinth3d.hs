@@ -215,7 +215,7 @@ mainLoop st = do
 -- | Main function called from Haskell. Initialize maze and start main loop.
 main :: IO ()
 main = do
-    let path = "."
+    let path = "Labyrinth3d"
     files <- T.findFiles path ".map"
     file <- selectFrom files
     mazeString <- readFile (concat [path, "/", file])
