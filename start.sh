@@ -1,11 +1,19 @@
 #!/bin/sh
+
+if [ "$1" = '-d' ] ; then
+    debug=1
+    shift
+else
+    debug=""
+fi
+
 reset() { stty $clropt ; }
 
 case `uname` in
-    Darwin) echo "Tested OS" >&2 ;;
+    Darwin) if [ -n "$debug" ] ; then echo "Tested OS" >&2 ; fi ;;
     Linux) echo "Untested OS - let's see if stty can do it anyway..." >&2 ;;
-    SunOS) echo "Tested OS" >&2 ;;
-    *) echo "You are on your own. Trying sty anyway" >&2 ;;
+    SunOS) if [ -n "$debug" ] ; then echo "Tested OS" >&2 ; fi ;;
+    *) echo "You are on your own. Trying stty anyway" >&2 ;;
 esac
 
 setopt=`stty -a | grep -w icanon | while read line ; do
@@ -25,9 +33,16 @@ setopt="$setopt "`stty -a | grep -w echo | while read line ; do
 done`
 clropt=`echo $setopt | sed 's/-//g'`
 
-echo "setopt:$setopt / clropt:$clropt" >&2
+if [ -n "$debug" ] ; then
+    echo "setopt:$setopt / clropt:$clropt" >&2
+fi
 
-if [ -f "$1" ] ; then
+if [ -z "$1" ] ; then
+    echo "Usage: $0 [-d] <haskellGame>" >&2
+    echo "You can omit the .hs extension" >&2
+    echo "-d Debug output" >&2
+    exit 1
+elif [ -f "$1" ] ; then
     game="$1"
 elif [ -f "$1"'.hs' ] ; then
     game="$1"'.hs'
