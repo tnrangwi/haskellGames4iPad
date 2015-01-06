@@ -1,10 +1,12 @@
 import qualified Tools as T
 import qualified LocalSettings as Settings
+import qualified Control.Monad as CM
 
 -- | Calculated position result. Coordinates, forbidden movement or left labyrinth.
 data MazePosition = MazeOff         -- ^ Forbidden movement.
                   | MazeAt Position -- ^ New calculated position.
                   | MazeSolved      -- ^ Left labyrinth.
+                  | MazeItem Position Collectable
 
 -- | Configuration how to show current position and environment.
 data DrawMode = FullSight -- ^ Show whole labyrinth and "ship" with orientation.
@@ -13,8 +15,12 @@ data DrawMode = FullSight -- ^ Show whole labyrinth and "ship" with orientation.
               deriving (Eq,Enum,Bounded)
 
 -- | One brick of the maze's map
-data Brick = Stone | Space | Exit | Ship
-           deriving (Eq,Enum,Bounded,Show)
+data Brick = Stone | Space | Exit | Ship | Item Collectable
+           deriving (Eq,Show)
+
+-- | Anything that can be picked up in the labyrinth
+data Collectable = Maps | FooBar
+                 deriving (Eq,Show)
 
 -- | A direction for a movement.
 data Direction = Lft | Rght | Fwd | Bckw
@@ -30,9 +36,10 @@ data Position = Position { orientation :: Orientation -- ^ In which directiom do
                          }
 
 -- | Current state of game.
-data MazeState = MazeState {  mazeMap :: [String]  -- ^ Map of labyrinth
-                           ,  position :: Position -- ^ Coordinates including orientation of ship
-                           ,  drawMode ::DrawMode  -- ^ Selected view mode.
+data MazeState = MazeState {  mazeMap  :: [String]      -- ^ Map of labyrinth
+                           ,  position :: Position      -- ^ Coordinates including orientation of ship
+                           ,  drawMode :: DrawMode      -- ^ Selected view mode.
+                           ,  items    :: [Collectable] -- ^ Items collected up to now
                            }
 
 
@@ -76,8 +83,14 @@ content :: [String]  -- ^ Map of maze
 content m (x,y) | y < 0 = Stone
                 | y >= (length m) = Exit
                 | or [x < 0, x >= length (m !! y)] = Stone
-                | ' ' /= m !! y !! x = Stone
+                | '.' == m !! y !! x = Stone
+                | 'M' == m !! y !! x = Item Maps
                 | otherwise = Space
+
+switchView :: DrawMode -> [Collectable] -> DrawMode
+switchView FullSight _ = if Settings.screenDetail then SightGfx else Sight3d
+switchView s l = if Maps `elem` l then FullSight else s
+
 
 -- | Create an abstract view from the current position into the maze.
 abstractView :: [String]  -- ^ The map of the maze.
@@ -105,26 +118,30 @@ abstractView m p =
 
 -- | Calculate a list of strings for output, reflecting the
 -- ship at the current position of the map.
-view :: MazeState -- ^ Map, ship direction/position and selected view mode
+view :: [String]  -- ^ Currently used map
+     -> Position  -- ^ Positionwithin the map
+     -> DrawMode  -- ^ Selected view mode
      -> [String]  -- ^ Output, one line each
-view (MazeState m (Position o (x,y)) FullSight) = T.updateMap (ship o) m x y
-view (MazeState m p@(Position o (x,y)) Sight3d) =
+view m (Position o (x,y)) FullSight = T.updateMap (ship o) m x y
+view m p@(Position o (x,y)) Sight3d =
     let v Stone = '*'
         v Space = ' '
         v Exit = '.'
         v Ship = '^'
+        v (Item Maps) = 'M'
         mz = abstractView m p
     in concat [
                 [(show x) ++ "/" ++ (show y) ++ "/" ++ (show o) ++ "/" ++ (show (length m))],
                 map (map v) mz
               ]
-view (MazeState m p@(Position o (x,y)) SightGfx) = 
+view m p@(Position o (x,y)) SightGfx = 
     let mz = abstractView m p
         st = (show x) ++ "/" ++ (show y) ++ "/" ++ (show o) ++ "/" ++ (show (length m))
         v Stone = ["/-\\", "| |", "\\-/"]
         v Space = ["   ", "   ", "   "]
         v Exit = ["...", "...", "..."]
         v Ship = ["   ", " ^ ", "   "]
+        v (Item Maps) = [" _ ","|M|","   "]
         matrix = map (T.mergeRectangle . map v) mz
     in concat [
                 [st],
@@ -138,7 +155,10 @@ paint s = mapM_ putStrLn s >> (mapM_ putStrLn $ take (Settings.screenSize - leng
 
 -- | Draw ship. Calculate output using pure function and put result to stdout
 draw :: MazeState -> IO ()
-draw = paint . view
+draw st = let m = mazeMap st
+              p = position st
+              d = drawMode st
+          in paint $ view m p d
 
 -- | Move ship and calculate new position. Return solved, wrong move or new position.
 moveShip :: MazeState    -- ^ Game state. FIXME: Only map and position required.
@@ -158,7 +178,8 @@ moveShip st mv =
         (x1,y1) = coord p1
     in
         if (y1 >= length m) then MazeSolved
-        else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff                             
+        else if 'M' == m !! y1 !! x1 then MazeItem p1 Maps        
+        else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff
         else MazeAt p1
 
 -- | Wait for arbitrary key
@@ -166,8 +187,11 @@ getOK :: IO ()
 getOK = getChar >> return ()
 
 -- | Query user to select one item from a short list.
+-- The query lasts until one element is selected, so
+-- it has to fail if the list is empty.
 selectFrom :: [String]  -- ^ Selection of strings.
            -> IO String -- ^ Selected string.
+selectFrom [] = error "Empty list - program aborted to break endless loop"
 selectFrom l = do
     mapM_ (\(n,s) -> putStrLn $ concat[show n,":",s]) (zip (take 9 [1 ..]) l)
     putStrLn "Your selection:"
@@ -200,9 +224,12 @@ mainLoop st = do
                 "x: eXit",
                 "",
                 "[Hit any key to continue]"] >> getOK >> draw st >> mainLoop st
+    else if mv == 'a' then
+        paint ("You carry:" : (map show (items st))) >> getOK >> draw st >> mainLoop st
     else if mv == 's' then
-        let st1 = st { drawMode = T.roll $ drawMode st } in
-        draw st1 >> mainLoop st1
+        let dm1 = switchView (drawMode st) (items st)
+            st1 = st { drawMode = dm1 }
+        in draw st1 >> mainLoop st1
     else
         case moveShip st mv of
             MazeOff -> mainLoop st
@@ -211,15 +238,24 @@ mainLoop st = do
                 draw st1
                 mainLoop st1
             MazeSolved -> putStrLn "Herzlichen Glueckwunsch. Du hast es geschafft!"
+            MazeItem p1 i -> do
+                let m = mazeMap st
+                let (x,y) = coord p1
+                let m1 = T.updateMap ' ' m x y
+                let items1 = i:(items st)
+                let st1 = st { position = p1, mazeMap = m1, items = items1 }
+                draw st1
+                mainLoop st1
 
 -- | Main function called from Haskell. Initialize maze and start main loop.
 main :: IO ()
 main = do
     let path = "Labyrinth3d"
     files <- T.findFiles path ".map"
+    CM.when (null files) (fail "Setup error, no maps found!")
     file <- selectFrom files
     mazeString <- readFile (concat [path, "/", file])
     let maze = lines mazeString
-    let st = MazeState maze (Position South (0,0)) FullSight
+    let st = MazeState maze (Position South (0,0)) (switchView FullSight []) []
     draw st
     mainLoop st
