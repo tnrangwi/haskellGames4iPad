@@ -15,11 +15,11 @@ data DrawMode = FullSight -- ^ Show whole labyrinth and "ship" with orientation.
               deriving (Eq,Enum,Bounded)
 
 -- | One brick of the maze's map
-data Brick = Stone | Space | Exit | Ship | Item Collectable
+data Brick = Stone | Space | Exit | Ship | RedDoor | YellowDoor | GreenDoor | Item Collectable
            deriving (Eq,Show)
 
 -- | Anything that can be picked up in the labyrinth
-data Collectable = Maps | FooBar
+data Collectable = Maps | RedKey | YellowKey | GreenKey
                  deriving (Eq,Show)
 
 -- | A direction for a movement.
@@ -76,15 +76,22 @@ move Bckw p = turn Bckw . move Fwd . turn Bckw $ p
 
 -- | Calculate content within maze for position
 -- FIXME: Better convert into a maze datatype during read-in
--- and then use functions to retrieve data at position
+-- and then use functions to retrieve data at position. Currently the maze is converted at
+-- any move and then back. Better do that once.
 content :: [String]  -- ^ Map of maze
         -> (Int,Int) -- ^ Coordinates
         -> Brick     -- ^ What is there
 content m (x,y) | y < 0 = Stone
                 | y >= (length m) = Exit
                 | or [x < 0, x >= length (m !! y)] = Stone
-                | '.' == m !! y !! x = Stone
                 | 'M' == m !! y !! x = Item Maps
+                | 'r' == m !! y !! x = Item RedKey
+                | 'g' == m !! y !! x = Item GreenKey
+                | 'y' == m !! y !! x = Item YellowKey
+                | 'R' == m !! y !! x = RedDoor
+                | 'G' == m !! y !! x = GreenDoor
+                | 'Y' == m !! y !! x = YellowDoor
+                | ' ' /= m !! y !! x = Stone
                 | otherwise = Space
 
 switchView :: DrawMode -> [Collectable] -> DrawMode
@@ -128,7 +135,13 @@ view m p@(Position o (x,y)) Sight3d =
         v Space = ' '
         v Exit = '.'
         v Ship = '^'
+        v RedDoor = 'R'
+        v YellowDoor = 'Y'
+        v GreenDoor = 'G'
         v (Item Maps) = 'M'
+        v (Item RedKey) = 'r'
+        v (Item YellowKey) = 'y'
+        v (Item GreenKey) = 'g'
         mz = abstractView m p
     in concat [
                 [(show x) ++ "/" ++ (show y) ++ "/" ++ (show o) ++ "/" ++ (show (length m))],
@@ -141,7 +154,13 @@ view m p@(Position o (x,y)) SightGfx =
         v Space = ["   ", "   ", "   "]
         v Exit = ["...", "...", "..."]
         v Ship = ["   ", " ^ ", "   "]
+        v RedDoor = ["\\ /"," L ","/ \\"]
+        v YellowDoor = ["\\ /"," F ","/ \\"]
+        v GreenDoor = ["\\ /"," E ","/ \\"]
         v (Item Maps) = [" _ ","|M|","   "]
+        v (Item RedKey) = ["<| "," | "," O "]
+        v (Item YellowKey) = [" | ","<| "," O "]
+        v (Item GreenKey) = ["<| ","<| "," O "]
         matrix = map (T.mergeRectangle . map v) mz
     in concat [
                 [st],
@@ -160,25 +179,40 @@ draw st = let m = mazeMap st
               d = drawMode st
           in paint $ view m p d
 
+movement :: Char            -- ^ Movement character aa chosen by the console
+         -> Maybe Direction -- ^ Converted: direction to move into
+movement 'i' = Just Fwd
+movement 'm' = Just  Bckw
+movement 'j' = Just Lft
+movement 'k' = Just Rght
+movement _  = Nothing
+
 -- | Move ship and calculate new position. Return solved, wrong move or new position.
-moveShip :: MazeState    -- ^ Game state. FIXME: Only map and position required.
-         -> Char         -- ^ Movement. FIXME: Use Direction instead.
-         -> MazePosition -- ^ New game state. FIXME: Only position required.
-moveShip st mv =
+moveShip :: MazeState       -- ^ Game state.
+         -> Maybe Direction -- ^ Direction to move
+         -> MazePosition    -- ^ New game state.
+moveship _ Nothing = MazeOff
+moveShip st (Just mv) =
     let p = position st
         (x,y) = coord p
-        o = orientation p
         m = mazeMap st
+        its = items st
         p1 = case mv of
-                 'k' -> turn Rght p
-                 'j' -> turn Lft p
-                 'i' -> move Fwd p
-                 'm' -> move Bckw p
+                 Rght -> turn Rght p
+                 Lft -> turn Lft p
+                 Fwd -> move Fwd p
+                 Bckw -> move Bckw p
                  _ -> p { coord = (-1,-1) }
         (x1,y1) = coord p1
     in
         if (y1 >= length m) then MazeSolved
-        else if 'M' == m !! y1 !! x1 then MazeItem p1 Maps        
+        else if 'M' == m !! y1 !! x1 then MazeItem p1 Maps
+        else if 'r' == m !! y1 !! x1 then MazeItem p1 RedKey
+        else if 'y' == m !! y1 !! x1 then MazeItem p1 YellowKey
+        else if 'g' == m !! y1 !! x1 then MazeItem p1 GreenKey
+        else if 'R' == m !! y1 !! x1 then (if RedKey `elem` its then MazeAt p1 else MazeOff)
+        else if 'Y' == m !! y1 !! x1 then (if YellowKey `elem` its then MazeAt p1 else MazeOff)
+        else if 'G' == m !! y1 !! x1 then (if GreenKey `elem` its then MazeAt p1 else MazeOff)
         else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff
         else MazeAt p1
 
@@ -231,7 +265,7 @@ mainLoop st = do
             st1 = st { drawMode = dm1 }
         in draw st1 >> mainLoop st1
     else
-        case moveShip st mv of
+        case (moveShip st (movement mv)) of
             MazeOff -> mainLoop st
             MazeAt p1 -> do
                 let st1 = st { position = p1 }
