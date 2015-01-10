@@ -254,10 +254,22 @@ mainLoop st = do
                 "J K   -> turn left / right",
                 " M    -> bwd",
                 "",
-                "s: Switch view",
+                "s: Switch to map - if there",
+                "a: Show what you carry.",
+                "H: game help",
                 "x: eXit",
                 "",
                 "[Hit any key to continue]"] >> getOK >> draw st >> mainLoop st
+    else if mv == 'H' then
+        paint ["Search the exit at the South.",
+               "Collect map to make it available",
+               "via the s key. Collect keys to",
+               "open the corresponding doors.",
+               "Just walk on items to collect them.",
+               "Map shows red / yellow / green",
+               "keys with small letters and",
+               "corresponding doors with",
+               "capital letters"] >> getOK >> draw st >> mainLoop st
     else if mv == 'a' then
         paint ("You carry:" : (map show (items st))) >> getOK >> draw st >> mainLoop st
     else if mv == 's' then
