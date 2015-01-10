@@ -13,11 +13,11 @@ Labyrinth.hs and Numbers.hs only need one file, Labyrinth3d.hs needs Labyrinth3d
 j k
  m
 
-for up, left, right and down. 'x' exits.
+for up, left, right and down. 'x' exits. Use 'h' hor online help.
 
 Labyrinth: Navigate the small snake to the bottom line, exiting the maze.
 
-Labyrinth3d: Navigate the "ship" through the maze. It only moves forwards and backwards, turn left or rigt to change direction.
+Labyrinth3d: Navigate the "ship" through the maze. It only moves forwards and backwards, turn left or rigt to change direction. You can create your own labyrinths, just create a *.map file in the Labyrinth3d subdirectory. Just make sure you can start from the upper left corner and you can reach the bottom line. The labyrinth is solved when you can navigate down from the very last line in the map. See test.map for an example using all possible items.
 
 Numbers: Order the numbers from 1 to fifteen. Use navigation to push a number to left / right / up / down into the empty space (the two dots).
 
