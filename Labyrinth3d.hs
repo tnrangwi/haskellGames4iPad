@@ -3,7 +3,7 @@ import qualified LocalSettings as Settings
 import qualified Control.Monad as CM
 
 -- | Calculated position result. Coordinates, forbidden movement or left labyrinth.
-data MazePosition = MazeOff         -- ^ Forbidden movement.
+data MazePosition = MazeOff (Maybe Collectable) -- ^ Forbidden movement with optional missing item.
                   | MazeAt Position -- ^ New calculated position.
                   | MazeSolved      -- ^ Left labyrinth.
                   | MazeItem Position Collectable
@@ -191,7 +191,7 @@ movement _  = Nothing
 moveShip :: MazeState       -- ^ Game state.
          -> Maybe Direction -- ^ Direction to move
          -> MazePosition    -- ^ New game state.
-moveship _ Nothing = MazeOff
+moveShip _ Nothing = MazeOff Nothing
 moveShip st (Just mv) =
     let p = position st
         (x,y) = coord p
@@ -203,6 +203,8 @@ moveShip st (Just mv) =
                  Fwd -> move Fwd p
                  Bckw -> move Bckw p
                  _ -> p { coord = (-1,-1) }
+        -- Check if item is there, then proceed, else fail
+        miss i = if i `elem` its then MazeAt p1 else MazeOff (Just i)
         (x1,y1) = coord p1
     in
         if (y1 >= length m) then MazeSolved
@@ -210,10 +212,10 @@ moveShip st (Just mv) =
         else if 'r' == m !! y1 !! x1 then MazeItem p1 RedKey
         else if 'y' == m !! y1 !! x1 then MazeItem p1 YellowKey
         else if 'g' == m !! y1 !! x1 then MazeItem p1 GreenKey
-        else if 'R' == m !! y1 !! x1 then (if RedKey `elem` its then MazeAt p1 else MazeOff)
-        else if 'Y' == m !! y1 !! x1 then (if YellowKey `elem` its then MazeAt p1 else MazeOff)
-        else if 'G' == m !! y1 !! x1 then (if GreenKey `elem` its then MazeAt p1 else MazeOff)
-        else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff
+        else if 'R' == m !! y1 !! x1 then miss RedKey
+        else if 'Y' == m !! y1 !! x1 then miss YellowKey
+        else if 'G' == m !! y1 !! x1 then miss GreenKey
+        else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff Nothing
         else MazeAt p1
 
 -- | Wait for arbitrary key
@@ -278,7 +280,8 @@ mainLoop st = do
         in draw st1 >> mainLoop st1
     else
         case (moveShip st (movement mv)) of
-            MazeOff -> mainLoop st
+            MazeOff Nothing -> mainLoop st
+            MazeOff (Just miss) -> paint ["Missing:" ++ (show miss)] >> getOK >> draw st >> mainLoop st
             MazeAt p1 -> do
                 let st1 = st { position = p1 }
                 draw st1
@@ -290,6 +293,8 @@ mainLoop st = do
                 let m1 = T.updateMap ' ' m x y
                 let items1 = i:(items st)
                 let st1 = st { position = p1, mazeMap = m1, items = items1 }
+                paint ["You collected:" ++ (show i)]
+                getOK
                 draw st1
                 mainLoop st1
 
