@@ -208,6 +208,7 @@ moveShip st (Just mv) =
         (x1,y1) = coord p1
     in
         if (y1 >= length m) then MazeSolved
+        else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1)] then MazeOff Nothing
         else if 'M' == m !! y1 !! x1 then MazeItem p1 Maps
         else if 'r' == m !! y1 !! x1 then MazeItem p1 RedKey
         else if 'y' == m !! y1 !! x1 then MazeItem p1 YellowKey
@@ -215,7 +216,7 @@ moveShip st (Just mv) =
         else if 'R' == m !! y1 !! x1 then miss RedKey
         else if 'Y' == m !! y1 !! x1 then miss YellowKey
         else if 'G' == m !! y1 !! x1 then miss GreenKey
-        else if or [x1 < 0, y1 < 0, x1 >= length (m !! y1), ' ' /= m !! y1 !! x1] then MazeOff Nothing
+        else if ' ' /= m !! y1 !! x1 then MazeOff Nothing
         else MazeAt p1
 
 -- | Wait for arbitrary key
