@@ -23,8 +23,8 @@ import qualified Data.List as DL
 -- |Update a sequence at the given position with the
 -- given element. Return original if index is out of
 -- bounds.
-updateAt :: [a]  -- ^ Lust to update.
-         ->  Int -- ^ Update at position.
+updateAt :: [a]  -- ^ List to update.
+         -> Int  -- ^ Update at position.
          -> a    -- ^ Update with thatcharacter.
          -> [a]  -- ^ Updated list.
 updateAt l i c = if or [i < 0, i >= length l] then
@@ -32,15 +32,15 @@ updateAt l i c = if or [i < 0, i >= length l] then
                  else
                      take i l ++ [c] ++ drop (i + 1) l
 
--- |Update a 2-dimensional map given as list of strings
--- with the given character at the given x / y 
+-- |Update a 2-dimensional map given as list of lists
+-- with the given element at the given x / y
 -- coordinates.
-updateMap :: Char     -- ^ Character to put into 2-dimensional map
-          -> [String] -- ^ line by line the lines of the map, left-justified, but
+updateMap :: a     -- ^ Character to put into 2-dimensional map
+          -> [[a]]    -- ^ line by line the lines of the map, left-justified, but
                       -- possibly of different length. Off the array meens off the map.
-          -> Int      -- ^ x coordinate of the position for the char to insert.
-          -> Int      -- ^ y coordinate of the position for the char to insert.
-          -> [String] -- ^ resulting map with additional character.
+          -> Int      -- ^ x coordinate of the position for the element to insert.
+          -> Int      -- ^ y coordinate of the position for the element to insert.
+          -> [[a]]    -- ^ resulting map with the overriding element.
 updateMap c m x y = if or [y < 0, x < 0, y >= length m, x >= length (m !! y)] then
                        m
                    else
@@ -69,7 +69,7 @@ randomUniqueSequence x g = gen [] g
 -- Current clocktime seconds are used to initialize
 -- the random number generator. This is suitable enough
 -- when a game just needs once such a series at startup.
--- It is not, when sequences are needes quite often. In
+-- It is not, when sequences are needed quite often. In
 -- that case better fetch the random number generator and
 -- use pure code to generate a large number of randoms.
 getRandomSequence :: Int -> IO [Int]
