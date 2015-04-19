@@ -11,7 +11,17 @@ data Direction = Up
                | Lft
                | Rght
                deriving (Show, Eq, Enum, Bounded)
-
+help :: [String]
+help = [
+         "Get numbers in right order:",
+         "Use",
+         "     i",
+         "    j k",
+         "     m",
+         "to move a number into the",
+         "free space.",
+         "Type 'x' for exit."
+       ]
 -- | Find position of empty spot. Return error because it must be there.
 spot :: [Int] -- ^ The Integer array with all numbers
      -> Int   -- ^ The index where the empty spot is.
@@ -46,13 +56,13 @@ calculate m d = let c = spot m -- where is cursor
                     in
                       if or[d == Lft,d == Rght] then
                         if (n `div` l) == (c `div` l) then Just (n,c) else Nothing
-                      else
+                      else   
                         if and [n >= 0,n < length m] then Just (n,c) else Nothing
 
 -- | Draw the current map, adding enough line feeds to emulate a clear screen.
-draw :: [[String]] -- ^ The current lines of the number map
+draw :: [String] -- ^ The current lines of the number map
      -> IO ()      -- ^ Printing adds IO
-draw m = mapM_ (putStrLn . concat) m >> (mapM_ putStrLn $ take (Settings.screenSize - length m) (repeat ""))
+draw m = mapM_ putStrLn m >> (mapM_ putStrLn $ take (Settings.screenSize - length m) (repeat ""))
 
 -- | Check whether the numbers are already sorted correctly. Empty spot marked as
 -- zero must be at the end, the rest has to be sorted ascendingly.
@@ -66,8 +76,8 @@ solved m = let o (x:y:ys) = and [x<y,o (y:ys)]
 -- | Given a list of unique numbers generate a 2-dimensional
 -- map, represented as lines, numbers converted into the corresponding
 -- characters, 0 representing the empty spot as two dots.
-getNumberMap :: [Int]      -- ^ the list of unique numbers to form a map of
-             -> [[String]] -- ^ the resulting 2-dimensional map
+getNumberMap :: [Int]    -- ^ the list of unique numbers to form a map of
+             -> [String] -- ^ the resulting 2-dimensional map
 getNumberMap m = let sp s = " " ++ s ++ " "
                      d 0 = sp ".."
                      d j = sp $ Pf.printf "%02d" j
@@ -76,12 +86,13 @@ getNumberMap m = let sp s = " " ++ s ++ " "
                                    (b,e) = splitAt (getColumns m) l
                                in
                                     [b] ++ (chunk e)
-                 in chunk $ map d m
+                 in map concat $ chunk $ map d m
 
 -- | Helper structure to handle main loop.
 data HandleMove = HandleExit         -- ^ User has chosen "exit".
                 | HandleMove Int Int -- ^ User has chosen a valid movement.
                 | HandleInvalid      -- ^ User has chosen an invalid character or movement.
+                | HandleHelp
                 deriving (Show, Eq)
 
 -- | Main loop. Map drawn, now read command and process it until
@@ -102,10 +113,13 @@ loop m = do
         else
           loop m1
       HandleInvalid -> loop m
+      HandleHelp -> draw help >> getChar >> draw (getNumberMap m) >> loop m
   where
     hCmd c -- handle command, return action chosen by user
       | c == 'x' = HandleExit
       | c `elem` "ijkm" = hMov c
+      | c == 'h' = HandleHelp
+      | otherwise = HandleInvalid
     hMov 'i' = testMov Down -- Translate character into movement; pushing a number up into
                             -- the empty spot means moving the empty spot down and the number
                             -- replacing the empty spot.
