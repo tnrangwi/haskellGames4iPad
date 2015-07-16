@@ -94,9 +94,10 @@ content m (x,y) | y < 0 = Stone
                 | ' ' /= m !! y !! x = Stone
                 | otherwise = Space
 
-switchView :: DrawMode -> [Collectable] -> DrawMode
-switchView FullSight _ = if Settings.screenDetail then SightGfx else Sight3d
-switchView s l = if Maps `elem` l then FullSight else s
+-- | Select a view mode depending on device
+selectView :: DrawMode -- ^ Simple or detailed view mode
+selectView = if Settings.screenDetail then SightGfx else Sight3d
+
 
 
 -- | Create an abstract view from the current position into the maze.
@@ -276,9 +277,10 @@ mainLoop st = do
     else if mv == 'a' then
         paint ("You carry:" : (map show (items st))) >> getOK >> draw st >> mainLoop st
     else if mv == 's' then
-        let dm1 = switchView (drawMode st) (items st)
-            st1 = st { drawMode = dm1 }
-        in draw st1 >> mainLoop st1
+        if Maps `elem` (items st) then
+            draw st { drawMode = FullSight } >> getOK >> draw st >> mainLoop st
+        else
+            mainLoop st
     else
         case (moveShip st (movement mv)) of
             MazeOff Nothing -> mainLoop st
@@ -308,6 +310,6 @@ main = do
     file <- selectFrom files
     mazeString <- readFile (concat [path, "/", file])
     let maze = lines mazeString
-    let st = MazeState maze (Position South (0,0)) (switchView FullSight []) []
+    let st = MazeState maze (Position South (0,0)) (selectView) []
     draw st
     mainLoop st
