@@ -168,17 +168,12 @@ view m p@(Position o (x,y)) SightGfx =
                 concat matrix
               ]
 
-
--- | Paint String array to screen.
-paint :: [String] -> IO ()
-paint s = mapM_ putStrLn s >> (mapM_ putStrLn $ take (Settings.screenSize - length s) (repeat ""))
-
 -- | Draw ship. Calculate output using pure function and put result to stdout
 draw :: MazeState -> IO ()
 draw st = let m = mazeMap st
               p = position st
               d = drawMode st
-          in paint $ view m p d
+          in T.paint $ view m p d
 
 movement :: Char            -- ^ Movement character aa chosen by the console
          -> Maybe Direction -- ^ Converted: direction to move into
@@ -252,7 +247,7 @@ mainLoop st = do
     if mv == 'x' then
         return ()
     else if mv == 'h' then
-        paint [ "h: This help",
+        T.paint [ "h: This help",
                 "",
                 " I    -> fwd",
                 "J K   -> turn left / right",
@@ -265,7 +260,7 @@ mainLoop st = do
                 "",
                 "[Hit any key to continue]"] >> getOK >> draw st >> mainLoop st
     else if mv == 'H' then
-        paint ["Search the exit at the South.",
+        T.paint ["Search the exit at the South.",
                "Collect map to make it available",
                "via the s key. Collect keys to",
                "open the corresponding doors.",
@@ -275,7 +270,7 @@ mainLoop st = do
                "corresponding doors with",
                "capital letters"] >> getOK >> draw st >> mainLoop st
     else if mv == 'a' then
-        paint ("You carry:" : (map show (items st))) >> getOK >> draw st >> mainLoop st
+        T.paint ("You carry:" : (map show (items st))) >> getOK >> draw st >> mainLoop st
     else if mv == 's' then
         if Maps `elem` (items st) then
             draw st { drawMode = FullSight } >> getOK >> draw st >> mainLoop st
@@ -284,7 +279,7 @@ mainLoop st = do
     else
         case (moveShip st (movement mv)) of
             MazeOff Nothing -> mainLoop st
-            MazeOff (Just miss) -> paint ["Missing:" ++ (show miss)] >> getOK >> draw st >> mainLoop st
+            MazeOff (Just miss) -> T.paint ["Missing:" ++ (show miss)] >> getOK >> draw st >> mainLoop st
             MazeAt p1 -> do
                 let st1 = st { position = p1 }
                 draw st1
@@ -296,7 +291,7 @@ mainLoop st = do
                 let m1 = T.updateMap ' ' m x y
                 let items1 = i:(items st)
                 let st1 = st { position = p1, mazeMap = m1, items = items1 }
-                paint ["You collected:" ++ (show i)]
+                T.paint ["You collected:" ++ (show i)]
                 getOK
                 draw st1
                 mainLoop st1
