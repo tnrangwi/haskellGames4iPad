@@ -10,7 +10,8 @@ module Tools
   roll,
   rollback,
   findFiles,
-  mergeRectangle
+  mergeRectangle,
+  paint
 )
 
 where
@@ -19,6 +20,7 @@ import qualified System.Time as T
 import qualified System.Random as R
 import qualified System.Directory as D
 import qualified Data.List as DL
+import qualified LocalSettings as Settings
 
 -- |Update a sequence at the given position with the
 -- given element. Return original if index is out of
@@ -109,3 +111,7 @@ mergeRectangle l =
             [[]]
         else
             [concat (map f l) | f <- (map (flip (!!)) [0 .. (x-1)])]
+
+-- | Paint String array to screen.
+paint :: [String] -> IO ()
+paint s = mapM_ putStrLn [""] >> mapM_ putStrLn s >> (mapM_ putStrLn $ take (Settings.screenSize - 1 - length s) (repeat ""))
